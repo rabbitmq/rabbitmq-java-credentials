@@ -1,0 +1,178 @@
+// Copyright (c) 2024-2025 Broadcom. All Rights Reserved.
+// The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// If you have any questions regarding licensing, please contact us at
+// info@rabbitmq.com.
+package com.rabbitmq.client.credentials.oauth2;
+
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.HttpsConfigurator;
+import com.sun.net.httpserver.HttpsParameters;
+import com.sun.net.httpserver.HttpsServer;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.math.BigInteger;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.security.spec.ECGenParameterSpec;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Date;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import org.bouncycastle.asn1.x500.X500NameBuilder;
+import org.bouncycastle.asn1.x500.style.BCStyle;
+import org.bouncycastle.cert.X509CertificateHolder;
+import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder;
+import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
+
+public final class OAuth2TestUtils {
+
+  private static final char[] KEY_STORE_PASSWORD = "password".toCharArray();
+
+  private OAuth2TestUtils() {}
+
+  public static String sampleJsonToken(String accessToken, Duration expiresIn) {
+    String json =
+        "{\n"
+            + "  \"access_token\" : \"{accessToken}\",\n"
+            + "  \"token_type\" : \"bearer\",\n"
+            + "  \"expires_in\" : {expiresIn},\n"
+            + "  \"scope\" : \"clients.read emails.write scim.userids password.write idps.write notifications.write oauth.login scim.write critical_notifications.write\",\n"
+            + "  \"jti\" : \"18c1b1dfdda04382a8bcc14d077b71dd\"\n"
+            + "}";
+    return json.replace("{accessToken}", accessToken)
+        .replace("{expiresIn}", expiresIn.getSeconds() + "");
+  }
+
+  public static int randomNetworkPort() throws IOException {
+    ServerSocket socket = new ServerSocket();
+    socket.bind(null);
+    int port = socket.getLocalPort();
+    socket.close();
+    return port;
+  }
+
+  public static byte[] readAll(InputStream in) throws IOException {
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    byte[] buffer = new byte[8192];
+    int read;
+    while ((read = in.read(buffer)) != -1) {
+      out.write(buffer, 0, read);
+    }
+    return out.toByteArray();
+  }
+
+  public static HttpServer startServer(int port, String path, HttpHandler handler) {
+    return startServer(port, path, null, handler);
+  }
+
+  public static HttpServer startServer(
+      int port, String path, KeyStore keyStore, HttpHandler handler) {
+    return startServer(port, path, keyStore, null, null, handler);
+  }
+
+  public static HttpServer startServer(
+      int port,
+      String path,
+      KeyStore keyStore,
+      String[] cipherSuites,
+      String[] namedGroups,
+      HttpHandler handler) {
+    HttpServer server;
+    try {
+      if (keyStore != null) {
+        KeyManagerFactory keyManagerFactory =
+            KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+        keyManagerFactory.init(keyStore, KEY_STORE_PASSWORD);
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(keyManagerFactory.getKeyManagers(), null, null);
+        server = HttpsServer.create(new InetSocketAddress(port), 0);
+        ((HttpsServer) server)
+            .setHttpsConfigurator(
+                new HttpsConfigurator(sslContext) {
+                  @Override
+                  public void configure(HttpsParameters params) {
+                    SSLParameters sslParameters = getSSLContext().getDefaultSSLParameters();
+                    if (cipherSuites != null) {
+                      sslParameters.setCipherSuites(cipherSuites);
+                    }
+                    if (namedGroups != null) {
+                      TlsUtils.setNamedGroups(sslParameters, namedGroups);
+                    }
+                    params.setSSLParameters(sslParameters);
+                  }
+                });
+      } else {
+        server = HttpServer.create(new InetSocketAddress(port), 0);
+      }
+      server.createContext(path, handler);
+      server.start();
+      return server;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  public static KeyStore generateKeyPair() {
+    return generateKeyPair("localhost");
+  }
+
+  public static KeyStore generateKeyPair(String commonName) {
+    try {
+      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keyStore.load(null, KEY_STORE_PASSWORD);
+
+      KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+      ECGenParameterSpec spec = new ECGenParameterSpec("secp521r1");
+      kpg.initialize(spec);
+
+      KeyPair kp = kpg.generateKeyPair();
+
+      JcaX509v3CertificateBuilder certificateBuilder =
+          new JcaX509v3CertificateBuilder(
+              new X500NameBuilder().addRDN(BCStyle.CN, commonName).build(),
+              BigInteger.valueOf(new SecureRandom().nextInt()),
+              Date.from(Instant.now().minus(10, ChronoUnit.DAYS)),
+              Date.from(Instant.now().plus(10, ChronoUnit.DAYS)),
+              new X500NameBuilder().addRDN(BCStyle.CN, commonName).build(),
+              kp.getPublic());
+
+      X509CertificateHolder certificateHolder =
+          certificateBuilder.build(
+              new JcaContentSignerBuilder("SHA256withECDSA").build(kp.getPrivate()));
+
+      X509Certificate certificate =
+          new JcaX509CertificateConverter().getCertificate(certificateHolder);
+
+      keyStore.setKeyEntry(
+          "localhost", kp.getPrivate(), KEY_STORE_PASSWORD, new X509Certificate[] {certificate});
+
+      return keyStore;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+}

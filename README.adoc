@@ -1,0 +1,56 @@
+= RabbitMQ Java Credentials
+
+Credentials management utilities shared by the https://www.rabbitmq.com/[RabbitMQ] Java libraries (token refresh, OAuth 2 client credentials support).
+
+[IMPORTANT]
+====
+This library is meant to be used only by the RabbitMQ Java libraries (e.g. the RabbitMQ AMQP 1.0 Java client and the RabbitMQ stream Java client).
+Its API is not public and not considered stable: it can change in any release without notice.
+
+Applications must not depend on it directly, and should use the credentials settings of the RabbitMQ Java client they use instead.
+====
+
+== Content
+
+* `com.rabbitmq.client.credentials`: credentials manager contract and token refresh
+* `com.rabbitmq.client.credentials.oauth2`: OAuth 2 token requests over HTTP(S) and token response parsing
+
+== Requirements
+
+* Java 8 or later
+* https://github.com/google/gson[Gson] for the `GsonTokenParser` (optional dependency)
+
+== Maven Coordinates
+
+For RabbitMQ Java libraries maintainers:
+
+[source,xml]
+----
+<dependency>
+    <groupId>com.rabbitmq.client</groupId>
+    <artifactId>credentials</artifactId>
+    <version>${credentials.version}</version>
+</dependency>
+----
+
+== Build
+
+To build and run the tests (no external service needed):
+
+----
+./mvnw clean verify
+----
+
+The project uses the https://github.com/google/google-java-format[Google Java Format].
+Format the code before committing (requires JDK 17 or later):
+
+----
+./mvnw spotless:apply
+----
+
+== License and Copyright
+
+(c) 2024-2026 Broadcom. All Rights Reserved.
+The term "Broadcom" refers to Broadcom Inc. and/or its subsidiaries.
+
+This package, the RabbitMQ Java Credentials library, is licensed under the http://www.apache.org/licenses/LICENSE-2.0[Apache License, version 2].

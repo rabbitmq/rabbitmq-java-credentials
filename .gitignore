@@ -1,0 +1,14 @@
+*~
+.sw?
+.*.sw?
+*.class
+*.iml
+*.ipr
+*.iws
+.DS_Store
+/.idea/
+/target/
+/.classpath
+/.project
+/.settings
+/.vscode/
