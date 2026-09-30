@@ -29,6 +29,7 @@ import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Type;
 import java.security.KeyStore;
 import java.time.Duration;
 import java.time.Instant;
@@ -142,7 +143,7 @@ public class HttpTokenRequesterTest {
     String token = requester.request().value();
     assertThat(token).contains(accessToken);
     Gson gson = new Gson();
-    TypeToken<Map<String, Object>> mapType = new TypeToken<Map<String, Object>>() {};
+    Type mapType = new TypeToken<Map<String, Object>>() {}.getType();
     Map<String, Object> tokenMap = gson.fromJson(token, mapType);
     assertThat(tokenMap)
         .containsEntry("access_token", accessToken)

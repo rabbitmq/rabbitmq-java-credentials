@@ -26,6 +26,9 @@ import static org.assertj.core.api.Assertions.within;
 import com.rabbitmq.client.credentials.CredentialsException;
 import com.rabbitmq.client.credentials.Token;
 import com.rabbitmq.client.credentials.TokenParser;
+import java.lang.reflect.InvocationTargetException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -82,5 +85,21 @@ public class GsonTokenParserTest {
     assertThatThrownBy(
             () -> parser.parse("{\"access_token\": \"token\", \"expires_in\": \"soon\"}"))
         .isInstanceOf(OAuth2Exception.class);
+  }
+
+  @Test
+  void constructorFailsFastWhenGsonIsMissing() throws Exception {
+    URL classes = GsonTokenParser.class.getProtectionDomain().getCodeSource().getLocation();
+    // only the library classes, GSON is not visible
+    try (URLClassLoader classLoader = new URLClassLoader(new URL[] {classes}, null)) {
+      Class<?> parserClass = classLoader.loadClass(GsonTokenParser.class.getName());
+      assertThatThrownBy(() -> classLoader.loadClass(GsonTokenParser.GSON_CLASS_NAME))
+          .isInstanceOf(ClassNotFoundException.class);
+      assertThatThrownBy(() -> parserClass.getConstructor().newInstance())
+          .isInstanceOf(InvocationTargetException.class)
+          .cause()
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("com.google.code.gson:gson");
+    }
   }
 }

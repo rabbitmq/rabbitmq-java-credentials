@@ -21,6 +21,7 @@ import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.rabbitmq.client.credentials.Token;
 import com.rabbitmq.client.credentials.TokenParser;
+import java.lang.reflect.Type;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -31,17 +32,32 @@ import java.util.Map;
  *
  * <p>Uses <a href="https://github.com/google/gson">GSON</a> for the JSON parsing.
  */
-public class GsonTokenParser implements TokenParser {
+public final class GsonTokenParser implements TokenParser {
 
-  private static final Gson GSON = new Gson();
-  private static final TypeToken<Map<String, Object>> MAP_TYPE =
-      new TypeToken<Map<String, Object>>() {};
+  static final String GSON_CLASS_NAME = "com.google.gson.Gson";
+
+  /**
+   * Create a parser.
+   *
+   * @throws IllegalStateException if GSON is not on the classpath
+   */
+  public GsonTokenParser() {
+    try {
+      Class.forName(GSON_CLASS_NAME, false, GsonTokenParser.class.getClassLoader());
+    } catch (ClassNotFoundException | LinkageError e) {
+      throw new IllegalStateException(
+          "GSON is required to parse OAuth 2 token responses, "
+              + "add com.google.code.gson:gson to the classpath "
+              + "or use another token parser implementation",
+          e);
+    }
+  }
 
   @Override
   public Token parse(String tokenAsString) {
     Map<String, Object> tokenAsMap;
     try {
-      tokenAsMap = GSON.fromJson(tokenAsString, MAP_TYPE);
+      tokenAsMap = Json.parse(tokenAsString);
     } catch (Exception e) {
       throw new OAuth2Exception("Error while parsing token response as JSON", e);
     }
@@ -64,6 +80,18 @@ public class GsonTokenParser implements TokenParser {
     Instant expirationTime =
         Instant.ofEpochMilli(System.currentTimeMillis() + expiresIn.toMillis());
     return new DefaultTokenInfo(accessToken, expirationTime);
+  }
+
+  // isolates the GSON references, so that the parser class can load without GSON
+  private static final class Json {
+
+    private static final Gson GSON = new Gson();
+    // fromJson(String, Type) rather than fromJson(String, TypeToken), which requires GSON 2.10+
+    private static final Type MAP_TYPE = new TypeToken<Map<String, Object>>() {}.getType();
+
+    private static Map<String, Object> parse(String json) {
+      return GSON.fromJson(json, MAP_TYPE);
+    }
   }
 
   private static final class DefaultTokenInfo implements Token {

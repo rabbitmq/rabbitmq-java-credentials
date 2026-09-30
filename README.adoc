@@ -18,7 +18,11 @@ Applications must not depend on it directly, and should use the credentials sett
 == Requirements
 
 * Java 8 or later
-* https://github.com/google/gson[Gson] for the `GsonTokenParser` (optional dependency)
+* https://github.com/google/gson[Gson] for the `GsonTokenParser`
+
+Gson is a transitive dependency, so OAuth 2 support works without adding any dependency.
+It is needed only for OAuth 2 and can be excluded otherwise: creating a `GsonTokenParser` fails with an `IllegalStateException` if Gson is not on the classpath.
+The library uses only long-standing Gson APIs, so it works with the Gson version an application may already use.
 
 == Maven Coordinates
 
