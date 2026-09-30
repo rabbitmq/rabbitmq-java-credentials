@@ -192,11 +192,13 @@ public final class TokenCredentialsManager implements CredentialsManager {
       return;
     }
     this.requestInFlight = true;
+    // computed on the loop, the registrations must not be read from the executor service
+    String summary = debug() ? registrationSummary(this.registrations.values()) : null;
     try {
       this.executorService.execute(
           () -> {
             try {
-              Token t = getToken();
+              Token t = getToken(summary);
               postToLoop(() -> onTokenReceived(t));
             } catch (Exception e) {
               postToLoop(() -> onTokenFailure(e));
@@ -216,10 +218,9 @@ public final class TokenCredentialsManager implements CredentialsManager {
     }
   }
 
-  private Token getToken() {
+  private Token getToken(String registrationSummary) {
     if (debug()) {
-      LOGGER.debug(
-          "Requesting new token ({})...", registrationSummary(this.registrations.values()));
+      LOGGER.debug("Requesting new token ({})...", registrationSummary);
     }
     long start = 0L;
     if (debug()) {
@@ -231,7 +232,7 @@ public final class TokenCredentialsManager implements CredentialsManager {
           "Got new token in {} ms, token expires on {} ({})",
           Duration.ofNanos(System.nanoTime() - start),
           format(t.expirationTime()),
-          registrationSummary(this.registrations.values()));
+          registrationSummary);
     }
     return t;
   }
@@ -342,7 +343,7 @@ public final class TokenCredentialsManager implements CredentialsManager {
         dispatchedCount++;
       }
     }
-    if (debug() || dispatchedCount > 0) {
+    if (debug() && dispatchedCount > 0) {
       LOGGER.debug("Updated {} registration(s)", dispatchedCount);
     }
   }
@@ -497,7 +498,7 @@ public final class TokenCredentialsManager implements CredentialsManager {
   }
 
   public static Function<Instant, Duration> ratioRefreshDelayStrategy(float ratio) {
-    if (ratio < 0 || ratio > 1) {
+    if (!(ratio > 0 && ratio <= 1)) {
       throw new IllegalArgumentException("Ratio should be > 0 and <= 1: " + ratio);
     }
     return new RatioRefreshDelayStrategy(ratio);

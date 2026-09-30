@@ -33,6 +33,9 @@ import static org.mockito.Mockito.when;
 import com.rabbitmq.client.credentials.CredentialsManager.AuthenticationCallback;
 import com.rabbitmq.client.credentials.CredentialsManager.Registration;
 import com.rabbitmq.client.credentials.TestUtils.Pair;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -50,6 +53,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.spi.LocationAwareLogger;
 
 public class TokenCredentialsManagerTest {
 
@@ -205,10 +211,18 @@ public class TokenCredentialsManagerTest {
   }
 
   @ParameterizedTest
-  @ValueSource(floats = {-0.1f, 1.1f})
+  @ValueSource(floats = {-0.1f, 0f, 1.1f, Float.NaN})
   void ratioRefreshDelayStrategyShouldRejectOutOfRangeRatio(float ratio) {
     assertThatThrownBy(() -> TokenCredentialsManager.ratioRefreshDelayStrategy(ratio))
         .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void ratioRefreshDelayStrategyShouldAcceptRatioOfOne() {
+    assertThat(
+            TokenCredentialsManager.ratioRefreshDelayStrategy(1f)
+                .apply(Instant.now().plusSeconds(10)))
+        .isCloseTo(ofSeconds(10), ofMillis(100));
   }
 
   @Test
@@ -666,6 +680,73 @@ public class TokenCredentialsManagerTest {
     // not the one that arrived while the callback was blocked
     assertThat(received.get(2)).isNotEqualTo("t3");
     a.close();
+  }
+
+  @Test
+  void debugLoggingShouldNotBreakTokenRequestsWhileRegistrationsChange() throws Exception {
+    // tokens are never usable (1-second usable margin), so every connect requests a new token
+    when(this.requester.request())
+        .thenAnswer(ignored -> token("ok", Instant.now().plus(ofMillis(10))));
+    TokenCredentialsManager credentials = manager(ignored -> ofSeconds(3600));
+    List<Registration> idleRegistrations =
+        range(0, 100)
+            .mapToObj(i -> credentials.register("idle-" + i, (u, p) -> {}))
+            .collect(toList());
+    int threadCount = 4;
+    int iterations = 500;
+    List<Throwable> failures = new CopyOnWriteArrayList<>();
+    ExecutorService churnPool = Executors.newFixedThreadPool(threadCount);
+    try (AutoCloseable ignored = debugLogging(TokenCredentialsManager.class)) {
+      CountDownLatch done = new CountDownLatch(threadCount);
+      for (int t = 0; t < threadCount; t++) {
+        int thread = t;
+        churnPool.execute(
+            () -> {
+              try {
+                for (int i = 0; i < iterations; i++) {
+                  Registration r = credentials.register("churn-" + thread + "-" + i, (u, p) -> {});
+                  try {
+                    r.connect(connectionCallback(() -> {}));
+                  } catch (Exception e) {
+                    failures.add(e);
+                  } finally {
+                    r.close();
+                  }
+                }
+              } finally {
+                done.countDown();
+              }
+            });
+      }
+      assertThat(done.await(60, SECONDS)).isTrue();
+    } finally {
+      churnPool.shutdownNow();
+      idleRegistrations.forEach(Registration::close);
+    }
+    assertThat(failures).isEmpty();
+  }
+
+  /**
+   * Enables debug logging for the given class and discards the output, as long as the returned
+   * instance is not closed. Relies on the slf4j-simple implementation.
+   */
+  private static AutoCloseable debugLogging(Class<?> loggerClass) throws Exception {
+    Logger logger = LoggerFactory.getLogger(loggerClass);
+    Field level = logger.getClass().getDeclaredField("currentLogLevel");
+    level.setAccessible(true);
+    int previousLevel = level.getInt(logger);
+    PrintStream previousErr = System.err;
+    System.setErr(
+        new PrintStream(
+            new OutputStream() {
+              @Override
+              public void write(int b) {}
+            }));
+    level.setInt(logger, LocationAwareLogger.DEBUG_INT);
+    return () -> {
+      level.setInt(logger, previousLevel);
+      System.setErr(previousErr);
+    };
   }
 
   private static Token token(String value, Instant expirationTime) {
