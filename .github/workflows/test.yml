@@ -31,7 +31,19 @@ jobs:
           distribution: 'temurin'
           java-version: '25'
           cache: 'maven'
+          server-id: central
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
       - name: Display Java version
         run: ./mvnw --version
       - name: Test
         run: ./mvnw verify --no-transfer-progress
+      - name: Publish snapshot
+        if: github.event_name != 'pull_request'
+        run: ./mvnw clean deploy -Ppublish -DskipTests --no-transfer-progress
+        env:
+          MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
