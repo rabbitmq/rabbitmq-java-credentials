@@ -76,7 +76,7 @@
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.11.0</central-publishing-maven-plugin.version>
         <spotless.version>3.10.3</spotless.version>
-        <spotbugs-maven-plugin.version>4.10.4.1</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.5.0</spotbugs-maven-plugin.version>
     </properties>
 
     <dependencies>
