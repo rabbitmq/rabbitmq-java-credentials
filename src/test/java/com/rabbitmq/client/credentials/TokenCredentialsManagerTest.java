@@ -98,11 +98,10 @@ public class TokenCredentialsManagerTest {
     Duration tokenExpiry = ofMillis(50);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok", Instant.now().plus(tokenExpiry));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok", Instant.now().plus(tokenExpiry));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     int expectedRefreshCount = 3;
     AtomicInteger refreshCount = new AtomicInteger();
@@ -139,18 +138,17 @@ public class TokenCredentialsManagerTest {
     AtomicInteger totalRefreshCount = new AtomicInteger();
     List<Pair<Registration, CountDownLatch>> registrations =
         range(0, connectionCount)
-            .mapToObj(
-                ignored -> {
-                  CountDownLatch sync = new CountDownLatch(expectedRefreshCountPerConnection);
-                  Registration r =
-                      credentials.register(
-                          "",
-                          (username, password) -> {
-                            totalRefreshCount.incrementAndGet();
-                            sync.countDown();
-                          });
-                  return pair(r, sync);
-                })
+            .mapToObj(ignored -> {
+              CountDownLatch sync = new CountDownLatch(expectedRefreshCountPerConnection);
+              Registration r =
+                  credentials.register(
+                      "",
+                      (username, password) -> {
+                        totalRefreshCount.incrementAndGet();
+                        sync.countDown();
+                      });
+              return pair(r, sync);
+            })
             .collect(toList());
 
     registrations.forEach(r -> r.v1().connect(connectionCallback(() -> {})));
@@ -185,14 +183,13 @@ public class TokenCredentialsManagerTest {
     Duration tokenExpiry = ofMillis(50);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              int count = requestCount.incrementAndGet();
-              if (count == 2) {
-                throw new CredentialsException("simulated transient failure");
-              }
-              return token("ok", Instant.now().plus(tokenExpiry));
-            });
+        .thenAnswer(ignored -> {
+          int count = requestCount.incrementAndGet();
+          if (count == 2) {
+            throw new CredentialsException("simulated transient failure");
+          }
+          return token("ok", Instant.now().plus(tokenExpiry));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     CountDownLatch refreshLatch = new CountDownLatch(1);
     Registration registration = credentials.register("", (u, p) -> refreshLatch.countDown());
@@ -230,11 +227,10 @@ public class TokenCredentialsManagerTest {
     Duration tokenExpiry = ofMillis(80);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok-" + requestCount.get(), Instant.now().plus(tokenExpiry));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok-" + requestCount.get(), Instant.now().plus(tokenExpiry));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     Registration r1 = credentials.register("r1", (u, p) -> {});
     r1.connect(connectionCallback(() -> {}));
@@ -264,11 +260,10 @@ public class TokenCredentialsManagerTest {
     Duration tokenExpiry = ofMillis(80);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok-" + requestCount.get(), Instant.now().plus(tokenExpiry));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok-" + requestCount.get(), Instant.now().plus(tokenExpiry));
+        });
     // never triggers a scheduled refresh, so the cached token just goes stale
     TokenCredentialsManager credentials = manager(ignored -> ofSeconds(3600));
     Registration r1 = credentials.register("r1", (u, p) -> {});
@@ -289,14 +284,13 @@ public class TokenCredentialsManagerTest {
     CountDownLatch requestGate = new CountDownLatch(1);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              int count = requestCount.incrementAndGet();
-              if (count == 2) {
-                assertThat(requestGate.await(10, SECONDS)).isTrue();
-              }
-              return token("ok-" + count, Instant.now().plus(ofSeconds(10)));
-            });
+        .thenAnswer(ignored -> {
+          int count = requestCount.incrementAndGet();
+          if (count == 2) {
+            assertThat(requestGate.await(10, SECONDS)).isTrue();
+          }
+          return token("ok-" + count, Instant.now().plus(ofSeconds(10)));
+        });
     TokenCredentialsManager credentials = manager(ignored -> ofMillis(50));
     Registration r1 = credentials.register("r1", (u, p) -> {});
     r1.connect(connectionCallback(() -> {}));
@@ -317,12 +311,11 @@ public class TokenCredentialsManagerTest {
     CountDownLatch requestGate = new CountDownLatch(1);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              requestGate.await(10, SECONDS);
-              return token("ok", Instant.now().plus(ofSeconds(10)));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          requestGate.await(10, SECONDS);
+          return token("ok", Instant.now().plus(ofSeconds(10)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     int threadCount = 10;
     List<String> values = new CopyOnWriteArrayList<>();
@@ -331,11 +324,10 @@ public class TokenCredentialsManagerTest {
       CountDownLatch done = new CountDownLatch(threadCount);
       for (int i = 0; i < threadCount; i++) {
         Registration r = credentials.register("r" + i, (u, p) -> {});
-        connectPool.execute(
-            () -> {
-              r.connect(connectionCallback(values::add));
-              done.countDown();
-            });
+        connectPool.execute(() -> {
+          r.connect(connectionCallback(values::add));
+          done.countDown();
+        });
       }
       Thread.sleep(200);
       requestGate.countDown();
@@ -351,14 +343,13 @@ public class TokenCredentialsManagerTest {
   void connectShouldFailWhenTokenRequestFails() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              int count = requestCount.incrementAndGet();
-              if (count == 1) {
-                throw new CredentialsException("simulated failure");
-              }
-              return token("ok", Instant.now().plus(ofSeconds(10)));
-            });
+        .thenAnswer(ignored -> {
+          int count = requestCount.incrementAndGet();
+          if (count == 1) {
+            throw new CredentialsException("simulated failure");
+          }
+          return token("ok", Instant.now().plus(ofSeconds(10)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     Registration r = credentials.register("r", (u, p) -> {});
     assertThatThrownBy(() -> r.connect(connectionCallback(() -> {})))
@@ -371,11 +362,10 @@ public class TokenCredentialsManagerTest {
   void connectShouldTimeOutWhenTokenRequestHangs() throws Exception {
     CountDownLatch requestGate = new CountDownLatch(1);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestGate.await(10, SECONDS);
-              return token("ok", Instant.now().plus(ofSeconds(10)));
-            });
+        .thenAnswer(ignored -> {
+          requestGate.await(10, SECONDS);
+          return token("ok", Instant.now().plus(ofSeconds(10)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY, ofMillis(200));
     Registration r = credentials.register("r", (u, p) -> {});
     assertThatThrownBy(() -> r.connect(connectionCallback(() -> {})))
@@ -387,25 +377,23 @@ public class TokenCredentialsManagerTest {
   void pendingConnectShouldFailWhenManagerIsClosed() throws Exception {
     CountDownLatch requestGate = new CountDownLatch(1);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestGate.await(10, SECONDS);
-              return token("ok", Instant.now().plus(ofSeconds(10)));
-            });
+        .thenAnswer(ignored -> {
+          requestGate.await(10, SECONDS);
+          return token("ok", Instant.now().plus(ofSeconds(10)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     Registration r = credentials.register("r", (u, p) -> {});
     ExecutorService connectPool = Executors.newSingleThreadExecutor();
     try {
       java.util.concurrent.Future<Exception> future =
-          connectPool.submit(
-              () -> {
-                try {
-                  r.connect(connectionCallback(() -> {}));
-                  return null;
-                } catch (Exception e) {
-                  return e;
-                }
-              });
+          connectPool.submit(() -> {
+            try {
+              r.connect(connectionCallback(() -> {}));
+              return null;
+            } catch (Exception e) {
+              return e;
+            }
+          });
       Thread.sleep(200);
       credentials.close();
       Exception result = future.get(10, SECONDS);
@@ -421,25 +409,23 @@ public class TokenCredentialsManagerTest {
     CountDownLatch requestGate = new CountDownLatch(1);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              requestGate.await(10, SECONDS);
-              return token("ok", Instant.now().plus(ofSeconds(10)));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          requestGate.await(10, SECONDS);
+          return token("ok", Instant.now().plus(ofSeconds(10)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     AtomicInteger callbackCount = new AtomicInteger();
     Registration r = credentials.register("r", (u, p) -> callbackCount.incrementAndGet());
     ExecutorService connectPool = Executors.newSingleThreadExecutor();
     try {
-      connectPool.execute(
-          () -> {
-            try {
-              r.connect(connectionCallback(() -> {}));
-            } catch (Exception e) {
-              // expected: the manager is closed before the token request completes
-            }
-          });
+      connectPool.execute(() -> {
+        try {
+          r.connect(connectionCallback(() -> {}));
+        } catch (Exception e) {
+          // expected: the manager is closed before the token request completes
+        }
+      });
       Thread.sleep(200);
       credentials.close();
       requestGate.countDown();
@@ -455,14 +441,13 @@ public class TokenCredentialsManagerTest {
   void refreshRetriesShouldStopWhenAllRegistrationsAreClosed() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              int count = requestCount.incrementAndGet();
-              if (count == 1) {
-                return token("ok", Instant.now().plus(ofMillis(50)));
-              }
-              throw new CredentialsException("simulated failure");
-            });
+        .thenAnswer(ignored -> {
+          int count = requestCount.incrementAndGet();
+          if (count == 1) {
+            return token("ok", Instant.now().plus(ofMillis(50)));
+          }
+          throw new CredentialsException("simulated failure");
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     Registration r = credentials.register("r", (u, p) -> {});
     r.connect(connectionCallback(() -> {}));
@@ -477,11 +462,10 @@ public class TokenCredentialsManagerTest {
   void closingLastRegistrationConcurrentlyWithNewConnectShouldKeepRefreshing() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok-" + requestCount.get(), Instant.now().plus(ofMillis(60)));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok-" + requestCount.get(), Instant.now().plus(ofMillis(60)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
 
     for (int i = 0; i < 30; i++) {
@@ -493,28 +477,26 @@ public class TokenCredentialsManagerTest {
       CountDownLatch bRefreshed = new CountDownLatch(1);
       Registration[] bHolder = new Registration[1];
       Thread closer =
-          new Thread(
-              () -> {
-                try {
-                  startGate.await(10, SECONDS);
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                }
-                a.close();
-              });
+          new Thread(() -> {
+            try {
+              startGate.await(10, SECONDS);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+            a.close();
+          });
       Thread registerer =
-          new Thread(
-              () -> {
-                Registration b =
-                    credentials.register("b-" + iteration, (u, p) -> bRefreshed.countDown());
-                bHolder[0] = b;
-                try {
-                  startGate.await(10, SECONDS);
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                }
-                b.connect(connectionCallback(() -> {}));
-              });
+          new Thread(() -> {
+            Registration b =
+                credentials.register("b-" + iteration, (u, p) -> bRefreshed.countDown());
+            bHolder[0] = b;
+            try {
+              startGate.await(10, SECONDS);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+            b.connect(connectionCallback(() -> {}));
+          });
       registerer.start();
       closer.start();
       startGate.countDown();
@@ -531,11 +513,10 @@ public class TokenCredentialsManagerTest {
     Duration tokenExpiry = ofMillis(50);
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok", Instant.now().plus(tokenExpiry));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok", Instant.now().plus(tokenExpiry));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     Registration r = credentials.register("r", (u, p) -> {});
     r.connect(connectionCallback(() -> {}));
@@ -571,11 +552,10 @@ public class TokenCredentialsManagerTest {
   void updatesShouldBeDeliveredInOrderPerRegistration() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              int count = requestCount.incrementAndGet();
-              return token("t" + count, Instant.now().plus(ofMillis(40)));
-            });
+        .thenAnswer(ignored -> {
+          int count = requestCount.incrementAndGet();
+          return token("t" + count, Instant.now().plus(ofMillis(40)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     List<Integer> received = new CopyOnWriteArrayList<>();
     Registration r =
@@ -591,11 +571,10 @@ public class TokenCredentialsManagerTest {
   void slowCallbackShouldNotDelayOtherRegistrations() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok-" + requestCount.get(), Instant.now().plus(ofMillis(40)));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok-" + requestCount.get(), Instant.now().plus(ofMillis(40)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     CountDownLatch slowGate = new CountDownLatch(1);
     Registration a =
@@ -622,11 +601,10 @@ public class TokenCredentialsManagerTest {
   void callbackExceptionShouldNotStopRefresh() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              requestCount.incrementAndGet();
-              return token("ok-" + requestCount.get(), Instant.now().plus(ofMillis(40)));
-            });
+        .thenAnswer(ignored -> {
+          requestCount.incrementAndGet();
+          return token("ok-" + requestCount.get(), Instant.now().plus(ofMillis(40)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     AtomicInteger callbackCount = new AtomicInteger();
     Registration r =
@@ -645,11 +623,10 @@ public class TokenCredentialsManagerTest {
   void supersededUpdateShouldBeSkipped() throws Exception {
     AtomicInteger requestCount = new AtomicInteger(0);
     when(this.requester.request())
-        .thenAnswer(
-            ignored -> {
-              int count = requestCount.incrementAndGet();
-              return token("t" + count, Instant.now().plus(ofMillis(40)));
-            });
+        .thenAnswer(ignored -> {
+          int count = requestCount.incrementAndGet();
+          return token("t" + count, Instant.now().plus(ofMillis(40)));
+        });
     TokenCredentialsManager credentials = manager(DEFAULT_REFRESH_DELAY_STRATEGY);
     CountDownLatch releaseGate = new CountDownLatch(1);
     CountDownLatch enteredGate = new CountDownLatch(1);
@@ -700,23 +677,22 @@ public class TokenCredentialsManagerTest {
       CountDownLatch done = new CountDownLatch(threadCount);
       for (int t = 0; t < threadCount; t++) {
         int thread = t;
-        churnPool.execute(
-            () -> {
+        churnPool.execute(() -> {
+          try {
+            for (int i = 0; i < iterations; i++) {
+              Registration r = credentials.register("churn-" + thread + "-" + i, (u, p) -> {});
               try {
-                for (int i = 0; i < iterations; i++) {
-                  Registration r = credentials.register("churn-" + thread + "-" + i, (u, p) -> {});
-                  try {
-                    r.connect(connectionCallback(() -> {}));
-                  } catch (Exception e) {
-                    failures.add(e);
-                  } finally {
-                    r.close();
-                  }
-                }
+                r.connect(connectionCallback(() -> {}));
+              } catch (Exception e) {
+                failures.add(e);
               } finally {
-                done.countDown();
+                r.close();
               }
-            });
+            }
+          } finally {
+            done.countDown();
+          }
+        });
       }
       assertThat(done.await(60, SECONDS)).isTrue();
     } finally {

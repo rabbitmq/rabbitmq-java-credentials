@@ -195,15 +195,14 @@ public final class TokenCredentialsManager implements CredentialsManager {
     // computed on the loop, the registrations must not be read from the executor service
     String summary = debug() ? registrationSummary(this.registrations.values()) : null;
     try {
-      this.executorService.execute(
-          () -> {
-            try {
-              Token t = getToken(summary);
-              postToLoop(() -> onTokenReceived(t));
-            } catch (Exception e) {
-              postToLoop(() -> onTokenFailure(e));
-            }
-          });
+      this.executorService.execute(() -> {
+        try {
+          Token t = getToken(summary);
+          postToLoop(() -> onTokenReceived(t));
+        } catch (Exception e) {
+          postToLoop(() -> onTokenFailure(e));
+        }
+      });
     } catch (RejectedExecutionException e) {
       this.requestInFlight = false;
       failWaiters(e);

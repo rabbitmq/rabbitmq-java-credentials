@@ -73,18 +73,16 @@ public class SerialExecutorTest {
     ExecutorService submitters = Executors.newFixedThreadPool(threadCount);
     try {
       for (int t = 0; t < threadCount; t++) {
-        submitters.submit(
-            () -> {
-              for (int i = 0; i < taskCountPerThread; i++) {
-                executor.execute(
-                    () -> {
-                      int current = active.incrementAndGet();
-                      max.updateAndGet(m -> Math.max(m, current));
-                      active.decrementAndGet();
-                      latch.countDown();
-                    });
-              }
+        submitters.submit(() -> {
+          for (int i = 0; i < taskCountPerThread; i++) {
+            executor.execute(() -> {
+              int current = active.incrementAndGet();
+              max.updateAndGet(m -> Math.max(m, current));
+              active.decrementAndGet();
+              latch.countDown();
             });
+          }
+        });
       }
       assertThat(latch.await(30, SECONDS)).isTrue();
     } finally {
@@ -105,16 +103,14 @@ public class SerialExecutorTest {
     ExecutorService submitters = Executors.newFixedThreadPool(threadCount);
     try {
       for (int t = 0; t < threadCount; t++) {
-        submitters.submit(
-            () -> {
-              for (int i = 0; i < taskCountPerThread; i++) {
-                executor.execute(
-                    () -> {
-                      counter[0]++;
-                      latch.countDown();
-                    });
-              }
+        submitters.submit(() -> {
+          for (int i = 0; i < taskCountPerThread; i++) {
+            executor.execute(() -> {
+              counter[0]++;
+              latch.countDown();
             });
+          }
+        });
       }
       assertThat(latch.await(30, SECONDS)).isTrue();
     } finally {
@@ -130,10 +126,9 @@ public class SerialExecutorTest {
     this.pool = Executors.newSingleThreadExecutor();
     SerialExecutor executor = new SerialExecutor(this.pool);
     BlockingQueue<String> result = new ArrayBlockingQueue<>(1);
-    executor.execute(
-        () -> {
-          throw new RuntimeException("expected failure");
-        });
+    executor.execute(() -> {
+      throw new RuntimeException("expected failure");
+    });
     executor.execute(() -> result.add("ok"));
     assertThat(result.poll(10, SECONDS)).isEqualTo("ok");
   }
@@ -155,16 +150,14 @@ public class SerialExecutorTest {
     SerialExecutor executor = new SerialExecutor(this.pool);
     List<String> order = new CopyOnWriteArrayList<>();
     BlockingQueue<Boolean> done = new ArrayBlockingQueue<>(1);
-    executor.execute(
-        () -> {
-          order.add("first");
-          executor.execute(
-              () -> {
-                order.add("nested");
-                done.add(true);
-              });
-          order.add("first-after-nested-submit");
-        });
+    executor.execute(() -> {
+      order.add("first");
+      executor.execute(() -> {
+        order.add("nested");
+        done.add(true);
+      });
+      order.add("first-after-nested-submit");
+    });
     assertThat(done.poll(10, SECONDS)).isTrue();
     assertThat(order).containsExactly("first", "first-after-nested-submit", "nested");
   }
@@ -183,13 +176,12 @@ public class SerialExecutorTest {
     int serialTaskCount = 200;
     for (int i = 0; i < serialTaskCount; i++) {
       boolean last = i == serialTaskCount - 1;
-      executor.execute(
-          () -> {
-            order.add("serial");
-            if (last) {
-              serialTasksDone.countDown();
-            }
-          });
+      executor.execute(() -> {
+        order.add("serial");
+        if (last) {
+          serialTasksDone.countDown();
+        }
+      });
     }
     this.pool.execute(() -> order.add("direct"));
     gate.countDown();

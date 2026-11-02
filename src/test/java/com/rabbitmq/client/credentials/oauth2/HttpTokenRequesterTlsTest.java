@@ -96,19 +96,15 @@ public class HttpTokenRequesterTlsTest {
 
   @Test
   void buildRejectsNamedGroupsWithoutSslContext() {
-    assertThatThrownBy(
-            () ->
-                validBuilder("http://localhost:" + port + contextPath)
-                    .namedGroups(PQC_GROUP)
-                    .build())
+    assertThatThrownBy(() ->
+            validBuilder("http://localhost:" + port + contextPath).namedGroups(PQC_GROUP).build())
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void buildRejectsCipherSuitesWithoutSslContext() {
-    assertThatThrownBy(
-            () ->
-                validBuilder("http://localhost:" + port + contextPath).ciphers(TLS_AES_256).build())
+    assertThatThrownBy(() ->
+            validBuilder("http://localhost:" + port + contextPath).ciphers(TLS_AES_256).build())
         .isInstanceOf(IllegalArgumentException.class);
   }
 

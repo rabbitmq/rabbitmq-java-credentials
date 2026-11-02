@@ -195,12 +195,11 @@ public class HttpTokenRequesterTest {
 
   @Test
   void buildRejectsTokenEndpointUriWithUserInfo() {
-    assertThatThrownBy(
-            () ->
-                validBuilder()
-                    .tokenEndpointUri(
-                        String.format("http://user:pwd@localhost:%d%s", port, contextPath))
-                    .build())
+    assertThatThrownBy(() ->
+            validBuilder()
+                .tokenEndpointUri(
+                    String.format("http://user:pwd@localhost:%d%s", port, contextPath))
+                .build())
         .isInstanceOf(IllegalArgumentException.class);
   }
 
